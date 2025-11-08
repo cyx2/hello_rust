@@ -14,7 +14,7 @@ use mongodb::{
 use serde::{Deserialize, Serialize};
 use std::{env, net::SocketAddr};
 use thiserror::Error;
-use tokio::signal;
+use tokio::{net::TcpListener, signal};
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::{error, info};
 
@@ -35,6 +35,8 @@ enum AppError {
     InvalidIdentifier(String),
     #[error("missing configuration: {0}")]
     MissingConfig(&'static str),
+    #[error("server error: {0}")]
+    Server(#[from] std::io::Error),
 }
 
 impl IntoResponse for AppError {
@@ -44,7 +46,7 @@ impl IntoResponse for AppError {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
             AppError::InvalidIdentifier(_) => StatusCode::BAD_REQUEST,
-            AppError::MissingConfig(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::MissingConfig(_) | AppError::Server(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
         let body = Json(serde_json::json!({
             "error": self.to_string(),
@@ -126,11 +128,12 @@ async fn main() -> Result<(), AppError> {
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     info!(%addr, "Starting API gateway");
 
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
+    let listener = TcpListener::bind(addr).await?;
+    axum::serve(listener, app.into_make_service())
         .with_graceful_shutdown(shutdown_signal())
-        .await
-        .map_err(AppError::from)
+        .await?;
+
+    Ok(())
 }
 
 async fn health() -> Json<HealthResponse> {
@@ -272,7 +275,7 @@ async fn shutdown_signal() {
 mod tests {
     use super::*;
     use axum::http::StatusCode;
-    use hyper::body::to_bytes;
+    use http_body_util::BodyExt;
 
     #[test]
     fn parse_identifier_accepts_object_id() {
@@ -316,7 +319,12 @@ mod tests {
     async fn app_error_invalid_identifier_response() {
         let response = AppError::InvalidIdentifier("bad".into()).into_response();
         let status = response.status();
-        let body = to_bytes(response.into_body()).await.expect("body bytes");
+        let body = response
+            .into_body()
+            .collect()
+            .await
+            .expect("body bytes")
+            .to_bytes();
         let json: serde_json::Value = serde_json::from_slice(&body).expect("json body");
 
         assert_eq!(status, StatusCode::BAD_REQUEST);
@@ -327,7 +335,12 @@ mod tests {
     async fn app_error_missing_config_response() {
         let response = AppError::MissingConfig("MONGODB_URI").into_response();
         let status = response.status();
-        let body = to_bytes(response.into_body()).await.expect("body bytes");
+        let body = response
+            .into_body()
+            .collect()
+            .await
+            .expect("body bytes")
+            .to_bytes();
         let json: serde_json::Value = serde_json::from_slice(&body).expect("json body");
 
         assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
