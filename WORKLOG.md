@@ -9,6 +9,7 @@ AI agents should not modify this document.
 - after enabling network access for the environment, it was able to download dependencies and see and resolve the issues that i was encountering. network access is very important!
 - also found out the hard way that codex cannot update prs that had contributions from me directly, which is annoying lock in
 - needed to prompt codex to write docs for its code, and unit tests, as well
+- it's unclear as to what should go in a README.md instead of AGENTS.md, because functionality being developed feels like it should be documented in both places. going with an approach of having README being for users, and AGENTS being for developers
 
 ### 2025-11-08
 - started by creating an AGENTS.md using /init and warp also created a WARP.md
