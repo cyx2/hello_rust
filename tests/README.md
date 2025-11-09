@@ -159,16 +159,22 @@ After running integration tests, test databases (matching the pattern `test_db_*
 
 **Run cleanup manually:**
 ```bash
-cargo test --test integration_test -- --ignored --nocapture cleanup::cleanup_test_databases
+cargo test --test integration_test -- --ignored --nocapture zzz_cleanup_test_databases
 ```
 
 The `--nocapture` flag shows the cleanup progress output.
 
-**Or run all tests including cleanup:**
+**Run all tests with cleanup automatically at the end:**
 ```bash
-cargo test -- --ignored
+# Sequential execution ensures cleanup runs last
+cargo test --test integration_test -- --ignored --test-threads=1 --nocapture
+```
+
+**Or run tests then cleanup separately:**
+```bash
+cargo test --test integration_test -- --ignored
 # Then run cleanup:
-cargo test --test integration_test -- --ignored cleanup::cleanup_test_databases
+cargo test --test integration_test -- --ignored --nocapture zzz_cleanup_test_databases
 ```
 
 The cleanup function will:
@@ -177,7 +183,10 @@ The cleanup function will:
 - Report success/failure for each database
 - Show a summary of cleaned databases
 
-**Note:** Cleanup is safe to run multiple times - it only affects databases matching the test pattern.
+**Note:** 
+- Cleanup is safe to run multiple times - it only affects databases matching the test pattern.
+- The cleanup test (`zzz_cleanup_test_databases`) is named with a `zzz_` prefix to ensure it runs last alphabetically.
+- When using `--test-threads=1` for sequential execution, cleanup will run after all other tests complete.
 
 ## Test Command Options
 
@@ -225,8 +234,10 @@ cargo test --no-run                 # Compile tests but don't run them
 
 **1. Run all tests (unit + integration):**
 ```bash
-cargo test -- --ignored
+cargo test && cargo test -- --ignored
 ```
+
+Note: There's no single cargo command to run both ignored and non-ignored tests together. The `&&` operator runs unit tests first, then integration tests if unit tests pass.
 
 **2. Run only unit tests:**
 ```bash
@@ -245,7 +256,11 @@ cargo test --test integration_test -- --ignored test_insert_one_and_find_one
 
 **5. Clean up test databases:**
 ```bash
-cargo test --test integration_test -- --ignored --nocapture cleanup::cleanup_test_databases
+# Run cleanup test (runs last alphabetically)
+cargo test --test integration_test -- --ignored --nocapture zzz_cleanup_test_databases
+
+# Or run all tests sequentially with cleanup at the end:
+cargo test --test integration_test -- --ignored --test-threads=1 --nocapture
 ```
 
 ## CI/CD Considerations
@@ -264,8 +279,8 @@ cargo test
 # Integration tests (if MongoDB available)
 cargo test -- --ignored
 
-# Cleanup (optional, for CI environments)
-cargo test --test integration_test -- --ignored cleanup::cleanup_test_databases
+# Cleanup (optional, for CI environments - runs last when using --test-threads=1)
+cargo test --test integration_test -- --ignored --test-threads=1 zzz_cleanup_test_databases
 ```
 
 ## Troubleshooting

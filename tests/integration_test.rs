@@ -902,16 +902,12 @@ async fn test_find_many_with_options() {
     assert_eq!(response["documents"].as_array().unwrap().len(), 2);
 }
 
-// Cleanup module that runs after tests
-mod cleanup {
-    use super::common;
-
-    #[tokio::test]
-    #[ignore] // Requires MongoDB to be running
-    async fn cleanup_test_databases() {
-        // Run cleanup to remove test databases created during test runs
-        // Run this test manually after other tests: cargo test --test integration_test -- --ignored cleanup_test_databases
-        // Or it will run automatically if included in the test run
-        common::cleanup_test_databases().await;
-    }
+// Cleanup test - runs last to clean up test databases
+// Named with 'zzz' prefix to ensure it runs last when tests execute sequentially
+#[tokio::test]
+#[ignore] // Requires MongoDB to be running
+async fn zzz_cleanup_test_databases() {
+    // Run cleanup to remove test databases created during test runs
+    // This test should run last - use --test-threads=1 to ensure sequential execution
+    common::cleanup_test_databases().await;
 }

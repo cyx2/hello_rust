@@ -173,12 +173,16 @@ cargo test
 **Integration Tests** (require MongoDB):
 ```bash
 cargo test -- --ignored
+# Or more specifically:
+cargo test --test integration_test -- --ignored
 ```
 
 **All Tests** (unit + integration):
 ```bash
-cargo test -- --ignored
+cargo test && cargo test -- --ignored
 ```
+
+Note: `cargo test -- --ignored` runs all ignored tests (integration tests in this repo). To run both unit and integration tests, use `&&` to chain the commands - unit tests run first (fast, no dependencies), then integration tests (requires MongoDB).
 
 ### Test Configuration
 
@@ -218,8 +222,14 @@ cargo test  # Only runs non-ignored tests
 
 After running integration tests, clean up test databases:
 ```bash
-cargo test --test integration_test -- --ignored --nocapture cleanup::cleanup_test_databases
+# Run cleanup test (runs last alphabetically)
+cargo test --test integration_test -- --ignored --nocapture zzz_cleanup_test_databases
+
+# Or run all tests sequentially with cleanup at the end:
+cargo test --test integration_test -- --ignored --test-threads=1 --nocapture
 ```
+
+Note: The cleanup test is named with `zzz_` prefix to ensure it runs last when tests execute sequentially. Use `--test-threads=1` to ensure sequential execution.
 
 For detailed testing documentation, see [`tests/README.md`](tests/README.md).
 

@@ -129,7 +129,9 @@ cargo test -- --quiet              # Minimal output (one char per test)
 - Run `cargo clippy -- -D warnings` to catch linting issues
 - Run `cargo test` to verify unit tests pass
 - Run `cargo test -- --ignored` to verify integration tests pass (if MongoDB available)
-- Run cleanup: `cargo test --test integration_test -- --ignored cleanup::cleanup_test_databases`
+- Run all tests: `cargo test && cargo test -- --ignored`
+- Run cleanup: `cargo test --test integration_test -- --ignored zzz_cleanup_test_databases`
+- Run all tests with cleanup last: `cargo test --test integration_test -- --ignored --test-threads=1`
 
 ### Commit & PR Habits
 Concise present-tense summaries (`init: scaffold cargo crate`), reference issues when possible (`fix: handle empty payload (#42)`). Each PR should outline intent, testing proof (`cargo test`, `cargo fmt`), and follow-up work. Attach screenshots/CLI transcripts for user-facing changes. Keep PRs focused and rebase onto `main` before requesting review.
