@@ -3,6 +3,8 @@
 ## Repo Purpose
 `hello_rust` is a ground-up Rust API gateway that fronts MongoDB CRUD operations. The codebase doubles as a testbed for agentic software workflows: nearly every change is produced by AI coding tools (OpenAI Codex CLI/web plus GitHub Copilot). Keep docs and automation friendly for autonomous contributors.
 
+> **Sync Note:** README.md targets end users operating the gateway; AGENTS.md is the developer/agent playbook. When overlapping topics appear (e.g., env vars, API surface), keep both files consistent and update them together.
+
 ## Product Specification
 
 ### Overview
