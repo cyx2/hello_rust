@@ -1,7 +1,9 @@
 # Agent Handbook
 
 ## Repo Purpose
-`hello_rust` is a ground-up Rust API gateway that fronts MongoDB CRUD operations. The codebase doubles as a testbed for agentic software workflows: nearly every change is produced by AI coding tools (OpenAI Codex CLI/web plus GitHub Copilot). Keep docs and automation friendly for autonomous contributors.
+`hello_rust` is a prototype Rust API gateway that fronts MongoDB CRUD operations. **This repository is 100% AI-generated** and serves as a testbed for AI software engineering tooling and process. The codebase is entirely produced by AI coding tools (OpenAI Codex CLI/web, GitHub Copilot, Cursor AI agents) and demonstrates the capabilities and limitations of AI-driven development workflows. Keep docs and automation friendly for autonomous contributors.
+
+**⚠️ Prototype Status:** This is not production-ready software. It is an experimental prototype for exploring AI-driven development processes.
 
 > **Sync Note:** README.md targets end users operating the gateway; AGENTS.md is the developer/agent playbook. When overlapping topics appear (e.g., env vars, API surface), keep both files consistent and update them together.
 
@@ -191,7 +193,7 @@ Concise present-tense summaries (`init: scaffold cargo crate`), reference issues
 - Clear separation of code and configuration
 
 ### Why Structured Logging?
-- Better observability in production
+- Better observability and debugging
 - Easier debugging with correlation IDs
 - Integration with log aggregation systems
 - Consistent log format across all endpoints
@@ -225,28 +227,31 @@ Concise present-tense summaries (`init: scaffold cargo crate`), reference issues
 ### Connection Pooling
 - Configure `MONGODB_POOL_MIN_SIZE` and `MONGODB_POOL_MAX_SIZE` based on expected load
 - Default values are reasonable for most use cases
-- Monitor connection pool metrics in production
+- Monitor connection pool metrics if deploying
 
 ### Request Handling
 - All handlers are async and non-blocking
 - MongoDB operations are async and use connection pooling
 - No blocking I/O in request handlers
-- Consider adding request timeout middleware for production
+- Consider adding request timeout middleware if deploying
 
 ### Logging Overhead
-- Use appropriate `LOG_LEVEL` in production (`warn` or `error`)
+- Use appropriate `LOG_LEVEL` (`warn` or `error`) to reduce noise
 - Structured logging has minimal overhead
-- Avoid logging large payloads in production
+- Avoid logging large payloads
 
 ## Security Considerations
+
+**⚠️ Prototype Status:** This prototype is not production-ready and has significant security limitations.
 
 ### Current Limitations
 - No authentication or authorization
 - No rate limiting
 - No input sanitization beyond basic validation
 - Direct MongoDB access without query validation
+- Not suitable for production deployment
 
-### Production Hardening Checklist
+### Future Enhancements (if converting to production)
 - [ ] Add authentication (API keys, OAuth, etc.)
 - [ ] Implement rate limiting
 - [ ] Add request size limits

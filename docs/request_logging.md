@@ -54,7 +54,7 @@ This pattern produces a minimal log sequence for the happy path and ensures ever
 
 The logging scheme provides a balanced trade-off between observability and noise:
 
-- Operators see exactly three structured log lines per request (receive, success, or failure) on the `info` channel, making it easy to follow individual calls in production logs.
+- Operators see exactly three structured log lines per request (receive, success, or failure) on the `info` channel, making it easy to follow individual calls in logs.
 - Validation issues (400), not-found cases (404), and driver failures (502) now emit `warn` logs that include the HTTP code and full error object, enabling faster debugging without inspecting HTTP traces.
 - Because the helpers avoid capturing references to the `AppState` or MongoDB client, there is no risk of accidental data cloning or contention in the logging path.
 
@@ -108,11 +108,11 @@ LOG_LEVEL=info
 ### Logging Sensitive Data
 - **Never log:** Passwords, API keys, tokens, full connection strings
 - **Sanitize:** MongoDB connection strings should be logged with credentials masked
-- **Filter:** Consider adding log filtering middleware for production to redact sensitive fields
+- **Filter:** Consider adding log filtering middleware to redact sensitive fields
 
 ### Performance Considerations
 - Structured logging has minimal overhead
-- Use appropriate log levels in production (`warn` or `error`)
+- Use appropriate log levels (`warn` or `error`) to reduce noise
 - Avoid logging extremely large payloads (consider truncation for large documents)
 - Correlation IDs enable efficient log aggregation and tracing
 
@@ -137,7 +137,7 @@ This enables:
 Each error response includes a `correlation_id` that can be used to:
 - Trace a request through multiple services
 - Correlate logs with error responses
-- Debug production issues efficiently
+- Debug issues efficiently
 
 ## Troubleshooting
 
@@ -147,7 +147,7 @@ Each error response includes a `correlation_id` that can be used to:
 - Ensure logs aren't being filtered by log aggregation system
 
 ### Too Much Log Noise
-- Reduce `LOG_LEVEL` to `warn` or `error` in production
+- Reduce `LOG_LEVEL` to `warn` or `error`
 - Consider filtering specific endpoints if needed
 - Review log output format and adjust verbosity
 

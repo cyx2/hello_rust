@@ -1,6 +1,8 @@
 # hello_rust
 
-A production-ready Rust API gateway that exposes MongoDB CRUD operations over HTTP. This service provides a RESTful interface to MongoDB, allowing clients to perform database operations without direct MongoDB driver dependencies.
+**⚠️ Prototype Status:** This repository is a prototype for AI software engineering tooling and process. The entire codebase is 100% AI-generated and is not production-ready. It serves as a testbed for exploring AI-driven development workflows.
+
+A Rust API gateway that exposes MongoDB CRUD operations over HTTP. This service provides a RESTful interface to MongoDB, allowing clients to perform database operations without direct MongoDB driver dependencies.
 
 ## Quick Start
 
@@ -482,18 +484,19 @@ For detailed testing documentation, see [`tests/README.md`](tests/README.md).
 
 - **Connection Pooling:** Configure `MONGODB_POOL_MIN_SIZE` and `MONGODB_POOL_MAX_SIZE` based on your expected load. Default pool sizes are managed by the MongoDB driver.
 - **Timeouts:** Set `MONGODB_CONNECT_TIMEOUT_MS` and `MONGODB_SERVER_SELECTION_TIMEOUT_MS` appropriately for your network conditions.
-- **Logging:** Adjust `LOG_LEVEL` to `warn` or `error` in production to reduce overhead. Use `info` or `debug` for troubleshooting.
+- **Logging:** Adjust `LOG_LEVEL` to `warn` or `error` to reduce overhead. Use `info` or `debug` for troubleshooting.
 - **Concurrent Requests:** The gateway handles concurrent requests efficiently using Tokio's async runtime. No special configuration needed.
 
 ## Security Notes
 
 ⚠️ **Important Security Considerations:**
 
-- **No Authentication:** This gateway currently has no authentication or authorization. Do not expose it to untrusted networks without additional security layers (e.g., reverse proxy with auth, VPN, firewall rules).
-- **Input Validation:** While the gateway validates required fields, it does not perform deep validation of MongoDB query structures. Ensure your application layer validates user inputs.
+- **Prototype Status:** This is a prototype and is not suitable for production use.
+- **No Authentication:** This gateway currently has no authentication or authorization. Do not expose it to untrusted networks.
+- **Input Validation:** While the gateway validates required fields, it does not perform deep validation of MongoDB query structures.
 - **Connection Strings:** Store MongoDB credentials securely. Never commit `.env` files with credentials to version control.
-- **Network Security:** Use TLS/SSL for MongoDB connections (`mongodb+srv://` or `mongodb://...?tls=true`) in production.
-- **Rate Limiting:** Consider adding rate limiting at the reverse proxy or application level for production deployments.
+- **Network Security:** Use TLS/SSL for MongoDB connections (`mongodb+srv://` or `mongodb://...?tls=true`) if deploying.
+- **Rate Limiting:** This prototype does not include rate limiting.
 
 ## Troubleshooting
 
