@@ -1,0 +1,75 @@
+use mongodb::bson::Document;
+use mongodb::Client;
+
+use crate::config::Config;
+use crate::error::ApiError;
+use crate::models::NamespacePayload;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub client: Client,
+    pub default_database: Option<String>,
+    pub default_collection: Option<String>,
+}
+
+impl AppState {
+    pub fn new(client: Client, config: &Config) -> Self {
+        Self {
+            client,
+            default_database: config.default_database.clone(),
+            default_collection: config.default_collection.clone(),
+        }
+    }
+
+    pub fn collection(
+        &self,
+        namespace: &NamespacePayload,
+    ) -> Result<mongodb::Collection<Document>, ApiError> {
+        let database = if namespace.database.trim().is_empty() {
+            return Err(ApiError::validation("database must be provided"));
+        } else {
+            namespace.database.trim()
+        };
+
+        let collection = if namespace.collection.trim().is_empty() {
+            return Err(ApiError::validation("collection must be provided"));
+        } else {
+            namespace.collection.trim()
+        };
+
+        Ok(self
+            .client
+            .database(database)
+            .collection::<Document>(collection))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn collection_requires_namespace_values() {
+        let client = Client::with_uri_str("mongodb://localhost:27017").expect("client");
+        let config = Config {
+            mongodb_uri: "mongodb://localhost:27017".into(),
+            default_database: None,
+            default_collection: None,
+            pool_min_size: None,
+            pool_max_size: None,
+            connect_timeout: None,
+            server_selection_timeout: None,
+            log_level: None,
+            bind_address: "127.0.0.1:3000".into(),
+        };
+        let state = AppState::new(client, &config);
+        let payload = NamespacePayload {
+            database: "".into(),
+            collection: "users".into(),
+        };
+        let err = state
+            .collection(&payload)
+            .expect_err("expected validation error");
+        assert_eq!(err.status().as_u16(), 400);
+    }
+}

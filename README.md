@@ -112,3 +112,33 @@ Lists collections within the specified database so clients can discover availabl
 - Document any required tooling (`rustup`, `cargo`, `mongodb` CLI) and commands (`cargo fmt`, `cargo clippy -- -D warnings`, `cargo test`) that developers should run before submitting changes.
 - Every PR must include appropriate unit/integration tests and demonstrate passing coverage via `cargo test`; new functionality without tests is not acceptable.
 - Ensure the README or a CONTRIBUTING file references the `.env.example` and describes how to copy it to `.env` for local development.
+
+## Local Development
+
+1. Install the Rust toolchain (Rustup/Cargo) and ensure MongoDB is available for integration testing.
+2. Copy the sample environment: `cp .env.example .env` and update the values to match your MongoDB cluster and desired pool/timeouts.
+3. Run the server with `cargo run`. The gateway binds to the address specified in `APP_BIND_ADDRESS` (defaults to `127.0.0.1:3000`).
+
+### Required Environment Variables
+
+The application reads all configuration from the environment. The `.env.example` file documents every supported knob:
+
+- `MONGODB_URI`, `MONGODB_DEFAULT_DATABASE`, `MONGODB_DEFAULT_COLLECTION`
+- Pool sizing: `MONGODB_POOL_MIN_SIZE`, `MONGODB_POOL_MAX_SIZE`
+- Timeouts: `MONGODB_CONNECT_TIMEOUT_MS`, `MONGODB_SERVER_SELECTION_TIMEOUT_MS`
+- Logging: `LOG_LEVEL`
+- HTTP binding: `APP_BIND_ADDRESS`
+
+### Development Commands
+
+Run the following before sending a change for review:
+
+```bash
+cargo fmt
+cargo clippy -- -D warnings
+cargo test
+```
+
+## Debugging in VS Code
+
+The repo includes `.vscode/launch.json` configured to start the gateway with environment variables sourced from the active shell. Use the “Debug Mongo Gateway” configuration to run with `cargo run` semantics directly from the editor.
