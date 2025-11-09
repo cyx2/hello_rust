@@ -53,7 +53,6 @@ impl ApiError {
         }
     }
 
-    #[cfg(test)]
     pub fn status(&self) -> StatusCode {
         self.status
     }

@@ -1,28 +1,66 @@
 use axum::extract::{Query, State};
+use axum::http::StatusCode;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use futures::TryStreamExt;
 use mongodb::bson::Document;
 use mongodb::Collection;
+use std::fmt::Debug;
 use tracing::instrument;
 
 use crate::error::{ApiError, ApiResult};
 use crate::models::*;
 use crate::state::AppState;
 
+const INSERT_ONE_PATH: &str = "/api/v1/documents/insert-one";
+const INSERT_MANY_PATH: &str = "/api/v1/documents/insert-many";
+const FIND_ONE_PATH: &str = "/api/v1/documents/find-one";
+const FIND_MANY_PATH: &str = "/api/v1/documents/find-many";
+const UPDATE_ONE_PATH: &str = "/api/v1/documents/update-one";
+const UPDATE_MANY_PATH: &str = "/api/v1/documents/update-many";
+const REPLACE_ONE_PATH: &str = "/api/v1/documents/replace-one";
+const DELETE_ONE_PATH: &str = "/api/v1/documents/delete-one";
+const DELETE_MANY_PATH: &str = "/api/v1/documents/delete-many";
+const LIST_COLLECTIONS_PATH: &str = "/api/v1/collections";
+
 pub fn router(state: AppState) -> Router {
     Router::new()
-        .route("/api/v1/documents/insert-one", post(insert_one))
-        .route("/api/v1/documents/insert-many", post(insert_many))
-        .route("/api/v1/documents/find-one", post(find_one))
-        .route("/api/v1/documents/find-many", post(find_many))
-        .route("/api/v1/documents/update-one", post(update_one))
-        .route("/api/v1/documents/update-many", post(update_many))
-        .route("/api/v1/documents/replace-one", post(replace_one))
-        .route("/api/v1/documents/delete-one", post(delete_one))
-        .route("/api/v1/documents/delete-many", post(delete_many))
-        .route("/api/v1/collections", get(list_collections))
+        .route(INSERT_ONE_PATH, post(insert_one))
+        .route(INSERT_MANY_PATH, post(insert_many))
+        .route(FIND_ONE_PATH, post(find_one))
+        .route(FIND_MANY_PATH, post(find_many))
+        .route(UPDATE_ONE_PATH, post(update_one))
+        .route(UPDATE_MANY_PATH, post(update_many))
+        .route(REPLACE_ONE_PATH, post(replace_one))
+        .route(DELETE_ONE_PATH, post(delete_one))
+        .route(DELETE_MANY_PATH, post(delete_many))
+        .route(LIST_COLLECTIONS_PATH, get(list_collections))
         .with_state(state)
+}
+
+fn log_request_received(endpoint: &str, request: &impl Debug) {
+    tracing::info!(target = "http", endpoint, ?request, "received request");
+}
+
+fn log_request_success(endpoint: &str, status: StatusCode, response: &impl Debug) {
+    tracing::info!(
+        target = "http",
+        endpoint,
+        status = %status,
+        ?response,
+        "request completed"
+    );
+}
+
+fn log_request_failure(endpoint: &str, error: ApiError) -> ApiError {
+    tracing::warn!(
+        target = "http",
+        endpoint,
+        status = %error.status(),
+        error = ?error,
+        "request failed"
+    );
+    error
 }
 
 fn map_driver_error(err: mongodb::error::Error) -> ApiError {
@@ -52,19 +90,23 @@ async fn insert_one(
     State(state): State<AppState>,
     Json(payload): Json<InsertOneRequest>,
 ) -> ApiResult<Json<InsertOneResponse>> {
+    log_request_received(INSERT_ONE_PATH, &payload);
     let InsertOneRequest {
         namespace,
         document,
         options,
     } = payload;
-    let collection = collection_from_state(&state, &namespace)?;
+    let collection = collection_from_state(&state, &namespace)
+        .map_err(|err| log_request_failure(INSERT_ONE_PATH, err))?;
     let result = collection
         .insert_one(document, options)
         .await
-        .map_err(map_driver_error)?;
-    Ok(Json(InsertOneResponse {
+        .map_err(|err| log_request_failure(INSERT_ONE_PATH, map_driver_error(err)))?;
+    let response = Json(InsertOneResponse {
         inserted_id: result.inserted_id,
-    }))
+    });
+    log_request_success(INSERT_ONE_PATH, StatusCode::OK, &response);
+    Ok(response)
 }
 
 #[instrument(skip_all)]
@@ -72,20 +114,27 @@ async fn insert_many(
     State(state): State<AppState>,
     Json(payload): Json<InsertManyRequest>,
 ) -> ApiResult<Json<InsertManyResponse>> {
+    log_request_received(INSERT_MANY_PATH, &payload);
     let InsertManyRequest {
         namespace,
         documents,
         options,
     } = payload;
     if documents.is_empty() {
-        return Err(ApiError::validation("documents must not be empty"));
+        return Err(log_request_failure(
+            INSERT_MANY_PATH,
+            ApiError::validation("documents must not be empty"),
+        ));
     }
-    let collection = collection_from_state(&state, &namespace)?;
+    let collection = collection_from_state(&state, &namespace)
+        .map_err(|err| log_request_failure(INSERT_MANY_PATH, err))?;
     let result = collection
         .insert_many(documents, options)
         .await
-        .map_err(map_driver_error)?;
-    Ok(Json(InsertManyResponse::from_result(result)))
+        .map_err(|err| log_request_failure(INSERT_MANY_PATH, map_driver_error(err)))?;
+    let response = Json(InsertManyResponse::from_result(result));
+    log_request_success(INSERT_MANY_PATH, StatusCode::OK, &response);
+    Ok(response)
 }
 
 #[instrument(skip_all)]
@@ -93,20 +142,29 @@ async fn find_one(
     State(state): State<AppState>,
     Json(payload): Json<FindOneRequest>,
 ) -> ApiResult<Json<FindOneResponse>> {
+    log_request_received(FIND_ONE_PATH, &payload);
     let FindOneRequest {
         namespace,
         filter,
         options,
     } = payload;
-    let collection = collection_from_state(&state, &namespace)?;
+    let collection = collection_from_state(&state, &namespace)
+        .map_err(|err| log_request_failure(FIND_ONE_PATH, err))?;
     let result = collection
         .find_one(filter, options)
         .await
-        .map_err(map_driver_error)?;
+        .map_err(|err| log_request_failure(FIND_ONE_PATH, map_driver_error(err)))?;
 
     match result {
-        Some(document) => Ok(Json(FindOneResponse { document })),
-        None => Err(ApiError::not_found("document not found")),
+        Some(document) => {
+            let response = Json(FindOneResponse { document });
+            log_request_success(FIND_ONE_PATH, StatusCode::OK, &response);
+            Ok(response)
+        }
+        None => Err(log_request_failure(
+            FIND_ONE_PATH,
+            ApiError::not_found("document not found"),
+        )),
     }
 }
 
@@ -115,21 +173,29 @@ async fn find_many(
     State(state): State<AppState>,
     Json(payload): Json<FindManyRequest>,
 ) -> ApiResult<Json<FindManyResponse>> {
+    log_request_received(FIND_MANY_PATH, &payload);
     let FindManyRequest {
         namespace,
         filter,
         options,
     } = payload;
-    let collection = collection_from_state(&state, &namespace)?;
+    let collection = collection_from_state(&state, &namespace)
+        .map_err(|err| log_request_failure(FIND_MANY_PATH, err))?;
     let mut cursor = collection
         .find(filter, options)
         .await
-        .map_err(map_driver_error)?;
+        .map_err(|err| log_request_failure(FIND_MANY_PATH, map_driver_error(err)))?;
     let mut documents = Vec::new();
-    while let Some(document) = cursor.try_next().await.map_err(map_driver_error)? {
+    while let Some(document) = cursor
+        .try_next()
+        .await
+        .map_err(|err| log_request_failure(FIND_MANY_PATH, map_driver_error(err)))?
+    {
         documents.push(document);
     }
-    Ok(Json(FindManyResponse { documents }))
+    let response = Json(FindManyResponse { documents });
+    log_request_success(FIND_MANY_PATH, StatusCode::OK, &response);
+    Ok(response)
 }
 
 #[instrument(skip_all)]
@@ -137,24 +203,31 @@ async fn update_one(
     State(state): State<AppState>,
     Json(payload): Json<UpdateRequest>,
 ) -> ApiResult<Json<UpdateResponse>> {
+    log_request_received(UPDATE_ONE_PATH, &payload);
     let UpdateRequest {
         namespace,
         filter,
         update,
         options,
     } = payload;
-    let collection = collection_from_state(&state, &namespace)?;
+    let collection = collection_from_state(&state, &namespace)
+        .map_err(|err| log_request_failure(UPDATE_ONE_PATH, err))?;
     let result = collection
         .update_one(filter, update, options.clone())
         .await
-        .map_err(map_driver_error)?;
+        .map_err(|err| log_request_failure(UPDATE_ONE_PATH, map_driver_error(err)))?;
     if result.matched_count == 0
         && result.upserted_id.is_none()
         && !options.as_ref().and_then(|opt| opt.upsert).unwrap_or(false)
     {
-        return Err(ApiError::not_found("no documents matched the filter"));
+        return Err(log_request_failure(
+            UPDATE_ONE_PATH,
+            ApiError::not_found("no documents matched the filter"),
+        ));
     }
-    Ok(Json(UpdateResponse::from_update_result(result)))
+    let response = Json(UpdateResponse::from_update_result(result));
+    log_request_success(UPDATE_ONE_PATH, StatusCode::OK, &response);
+    Ok(response)
 }
 
 #[instrument(skip_all)]
@@ -162,18 +235,22 @@ async fn update_many(
     State(state): State<AppState>,
     Json(payload): Json<UpdateRequest>,
 ) -> ApiResult<Json<UpdateResponse>> {
+    log_request_received(UPDATE_MANY_PATH, &payload);
     let UpdateRequest {
         namespace,
         filter,
         update,
         options,
     } = payload;
-    let collection = collection_from_state(&state, &namespace)?;
+    let collection = collection_from_state(&state, &namespace)
+        .map_err(|err| log_request_failure(UPDATE_MANY_PATH, err))?;
     let result = collection
         .update_many(filter, update, options)
         .await
-        .map_err(map_driver_error)?;
-    Ok(Json(UpdateResponse::from_update_result(result)))
+        .map_err(|err| log_request_failure(UPDATE_MANY_PATH, map_driver_error(err)))?;
+    let response = Json(UpdateResponse::from_update_result(result));
+    log_request_success(UPDATE_MANY_PATH, StatusCode::OK, &response);
+    Ok(response)
 }
 
 #[instrument(skip_all)]
@@ -181,24 +258,31 @@ async fn replace_one(
     State(state): State<AppState>,
     Json(payload): Json<ReplaceOneRequest>,
 ) -> ApiResult<Json<UpdateResponse>> {
+    log_request_received(REPLACE_ONE_PATH, &payload);
     let ReplaceOneRequest {
         namespace,
         filter,
         replacement,
         options,
     } = payload;
-    let collection = collection_from_state(&state, &namespace)?;
+    let collection = collection_from_state(&state, &namespace)
+        .map_err(|err| log_request_failure(REPLACE_ONE_PATH, err))?;
     let result = collection
         .replace_one(filter, replacement, options.clone())
         .await
-        .map_err(map_driver_error)?;
+        .map_err(|err| log_request_failure(REPLACE_ONE_PATH, map_driver_error(err)))?;
     if result.matched_count == 0
         && result.upserted_id.is_none()
         && !options.as_ref().and_then(|opt| opt.upsert).unwrap_or(false)
     {
-        return Err(ApiError::not_found("no documents matched the filter"));
+        return Err(log_request_failure(
+            REPLACE_ONE_PATH,
+            ApiError::not_found("no documents matched the filter"),
+        ));
     }
-    Ok(Json(UpdateResponse::from_update_result(result)))
+    let response = Json(UpdateResponse::from_update_result(result));
+    log_request_success(REPLACE_ONE_PATH, StatusCode::OK, &response);
+    Ok(response)
 }
 
 #[instrument(skip_all)]
@@ -206,22 +290,29 @@ async fn delete_one(
     State(state): State<AppState>,
     Json(payload): Json<DeleteRequest>,
 ) -> ApiResult<Json<DeleteResponse>> {
+    log_request_received(DELETE_ONE_PATH, &payload);
     let DeleteRequest {
         namespace,
         filter,
         options,
     } = payload;
-    let collection = collection_from_state(&state, &namespace)?;
+    let collection = collection_from_state(&state, &namespace)
+        .map_err(|err| log_request_failure(DELETE_ONE_PATH, err))?;
     let result = collection
         .delete_one(filter, options)
         .await
-        .map_err(map_driver_error)?;
+        .map_err(|err| log_request_failure(DELETE_ONE_PATH, map_driver_error(err)))?;
     if result.deleted_count == 0 {
-        return Err(ApiError::not_found("no documents matched the filter"));
+        return Err(log_request_failure(
+            DELETE_ONE_PATH,
+            ApiError::not_found("no documents matched the filter"),
+        ));
     }
-    Ok(Json(DeleteResponse {
+    let response = Json(DeleteResponse {
         deleted_count: result.deleted_count,
-    }))
+    });
+    log_request_success(DELETE_ONE_PATH, StatusCode::OK, &response);
+    Ok(response)
 }
 
 #[instrument(skip_all)]
@@ -229,19 +320,23 @@ async fn delete_many(
     State(state): State<AppState>,
     Json(payload): Json<DeleteRequest>,
 ) -> ApiResult<Json<DeleteResponse>> {
+    log_request_received(DELETE_MANY_PATH, &payload);
     let DeleteRequest {
         namespace,
         filter,
         options,
     } = payload;
-    let collection = collection_from_state(&state, &namespace)?;
+    let collection = collection_from_state(&state, &namespace)
+        .map_err(|err| log_request_failure(DELETE_MANY_PATH, err))?;
     let result = collection
         .delete_many(filter, options)
         .await
-        .map_err(map_driver_error)?;
-    Ok(Json(DeleteResponse {
+        .map_err(|err| log_request_failure(DELETE_MANY_PATH, map_driver_error(err)))?;
+    let response = Json(DeleteResponse {
         deleted_count: result.deleted_count,
-    }))
+    });
+    log_request_success(DELETE_MANY_PATH, StatusCode::OK, &response);
+    Ok(response)
 }
 
 #[instrument(skip_all)]
@@ -249,16 +344,22 @@ async fn list_collections(
     State(state): State<AppState>,
     Query(query): Query<CollectionQuery>,
 ) -> ApiResult<Json<CollectionsResponse>> {
+    log_request_received(LIST_COLLECTIONS_PATH, &query);
     if query.database.trim().is_empty() {
-        return Err(ApiError::validation("database must be provided"));
+        return Err(log_request_failure(
+            LIST_COLLECTIONS_PATH,
+            ApiError::validation("database must be provided"),
+        ));
     }
     let names = state
         .client
         .database(&query.database)
         .list_collection_names(None)
         .await
-        .map_err(map_driver_error)?;
-    Ok(Json(CollectionsResponse { collections: names }))
+        .map_err(|err| log_request_failure(LIST_COLLECTIONS_PATH, map_driver_error(err)))?;
+    let response = Json(CollectionsResponse { collections: names });
+    log_request_success(LIST_COLLECTIONS_PATH, StatusCode::OK, &response);
+    Ok(response)
 }
 
 #[cfg(test)]
