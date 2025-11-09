@@ -27,7 +27,6 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let env_filter = config
         .log_level
         .clone()
-        .map(|level| format!("{level}"))
         .unwrap_or_else(|| "info".to_string());
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_new(env_filter).unwrap_or_else(|_| EnvFilter::new("info")))

@@ -1,7 +1,9 @@
-use std::borrow::Cow;
-
+use dashmap::DashMap;
 use mongodb::bson::Document;
 use mongodb::Client;
+use mongodb::Collection;
+use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 
 use crate::config::Config;
 use crate::error::ApiError;
@@ -9,48 +11,118 @@ use crate::models::NamespacePayload;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub client: Client,
-    pub default_database: Option<String>,
-    pub default_collection: Option<String>,
+    inner: Arc<AppStateInner>,
+}
+
+struct AppStateInner {
+    client: Client,
+    default_database: Option<Arc<str>>,
+    default_collection: Option<Arc<str>>,
+    collections: DashMap<NamespaceKey, Collection<Document>>,
+}
+
+#[derive(Clone)]
+struct NamespaceKey {
+    database: Arc<str>,
+    collection: Arc<str>,
+}
+
+impl PartialEq for NamespaceKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.database.as_ref() == other.database.as_ref()
+            && self.collection.as_ref() == other.collection.as_ref()
+    }
+}
+
+impl Eq for NamespaceKey {}
+
+impl Hash for NamespaceKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.database.as_ref().hash(state);
+        self.collection.as_ref().hash(state);
+    }
+}
+
+impl NamespaceKey {
+    fn new(database: Arc<str>, collection: Arc<str>) -> Self {
+        Self {
+            database,
+            collection,
+        }
+    }
+
+    fn database(&self) -> &str {
+        self.database.as_ref()
+    }
+
+    fn collection(&self) -> &str {
+        self.collection.as_ref()
+    }
 }
 
 impl AppState {
     pub fn new(client: Client, config: &Config) -> Self {
-        Self {
+        let inner = AppStateInner {
             client,
-            default_database: config.default_database.clone(),
-            default_collection: config.default_collection.clone(),
+            default_database: config.default_database.as_deref().map(Arc::<str>::from),
+            default_collection: config.default_collection.as_deref().map(Arc::<str>::from),
+            collections: DashMap::new(),
+        };
+        Self {
+            inner: Arc::new(inner),
         }
+    }
+
+    pub fn client(&self) -> &Client {
+        &self.inner.client
     }
 
     pub fn collection(
         &self,
         namespace: &NamespacePayload,
     ) -> Result<mongodb::Collection<Document>, ApiError> {
-        let database: Cow<'_, str> = if namespace.database.trim().is_empty() {
-            Cow::Owned(
-                self.default_database
-                    .clone()
-                    .ok_or_else(|| ApiError::validation("database must be provided"))?,
-            )
-        } else {
-            Cow::Borrowed(namespace.database.trim())
+        let resolved = self.resolve_namespace(namespace)?;
+        Ok(self.inner.collection_for(&resolved))
+    }
+
+    fn resolve_namespace(&self, namespace: &NamespacePayload) -> Result<NamespaceKey, ApiError> {
+        let database = match namespace.database.trim() {
+            "" => self
+                .inner
+                .default_database
+                .as_ref()
+                .cloned()
+                .ok_or_else(|| ApiError::validation("database must be provided"))?,
+            value => Arc::<str>::from(value.to_owned()),
         };
 
-        let collection: Cow<'_, str> = if namespace.collection.trim().is_empty() {
-            Cow::Owned(
-                self.default_collection
-                    .clone()
-                    .ok_or_else(|| ApiError::validation("collection must be provided"))?,
-            )
-        } else {
-            Cow::Borrowed(namespace.collection.trim())
+        let collection = match namespace.collection.trim() {
+            "" => self
+                .inner
+                .default_collection
+                .as_ref()
+                .cloned()
+                .ok_or_else(|| ApiError::validation("collection must be provided"))?,
+            value => Arc::<str>::from(value.to_owned()),
         };
 
-        Ok(self
+        Ok(NamespaceKey::new(database, collection))
+    }
+}
+
+impl AppStateInner {
+    fn collection_for(&self, namespace: &NamespaceKey) -> Collection<Document> {
+        if let Some(entry) = self.collections.get(namespace) {
+            return entry.clone();
+        }
+
+        let collection = self
             .client
-            .database(&database)
-            .collection::<Document>(&collection))
+            .database(namespace.database())
+            .collection::<Document>(namespace.collection());
+        self.collections
+            .insert(namespace.clone(), collection.clone());
+        collection
     }
 }
 
