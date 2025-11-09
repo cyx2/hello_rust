@@ -1,0 +1,26 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug Mongo Gateway",
+            "program": "${workspaceFolder}/target/debug/hello_rust",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_LOG": "${env:LOG_LEVEL}",
+                "MONGODB_URI": "${env:MONGODB_URI}",
+                "MONGODB_DEFAULT_DATABASE": "${env:MONGODB_DEFAULT_DATABASE}",
+                "MONGODB_DEFAULT_COLLECTION": "${env:MONGODB_DEFAULT_COLLECTION}",
+                "MONGODB_POOL_MIN_SIZE": "${env:MONGODB_POOL_MIN_SIZE}",
+                "MONGODB_POOL_MAX_SIZE": "${env:MONGODB_POOL_MAX_SIZE}",
+                "MONGODB_CONNECT_TIMEOUT_MS": "${env:MONGODB_CONNECT_TIMEOUT_MS}",
+                "MONGODB_SERVER_SELECTION_TIMEOUT_MS": "${env:MONGODB_SERVER_SELECTION_TIMEOUT_MS}",
+                "APP_BIND_ADDRESS": "${env:APP_BIND_ADDRESS}",
+                "LOG_LEVEL": "${env:LOG_LEVEL}"
+            },
+            "sourceLanguages": ["rust"]
+        }
+    ]
+}
